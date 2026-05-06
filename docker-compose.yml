@@ -1,0 +1,15 @@
+services:
+  gamelib:
+    build: .
+    container_name: gamelib
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/app/data/gamelib.db"
+      LIBRARY_ROOT: "/library/games"
+      ART_CACHE_DIR: "/app/data/artwork"
+      PORT: "3000"
+    volumes:
+      - ./data:/app/data
+      - /mnt/nas/games:/library/games:ro
+    restart: unless-stopped

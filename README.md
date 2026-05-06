@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## GameLib
 
-## Getting Started
+Self-hosted game library frontend built with Next.js, designed for Linux/NAS Docker deployment with a mounted game folder.
 
-First, run the development server:
+### Features in this MVP
+- Fast game browsing from indexed data (SQLite)
+- IGDB-backed metadata/art enrichment with fallback metadata
+- Manual scan trigger from the UI
+- Docker-first runtime model for NAS
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Local development
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run dev` works on Windows now with defaults:
+- `DATABASE_URL=file:./dev.db`
+- `LIBRARY_ROOT=Z:\Games`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If your library is on a different path, create `.env.local` and override:
+- `LIBRARY_ROOT="Z:\\YourLibraryFolder"`
+- `DATABASE_URL="file:./dev.db"`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then:
+1. Generate Prisma client and push schema:
+   - `npm run db:generate`
+   - `npm run db:push`
+2. Start app:
+   - `npm run dev`
 
-## Learn More
+Then open [http://localhost:3000](http://localhost:3000).
 
-To learn more about Next.js, take a look at the following resources:
+## Docker / NAS
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Update `docker-compose.yml` host mount:
+   - `/mnt/nas/games:/library/games:ro`
+2. Build and run:
+   - `docker compose up -d --build`
+3. Open:
+   - `http://<nas-ip>:3000`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The container stores DB and art cache in `./data`.
 
-## Deploy on Vercel
+## API endpoints
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `GET /api/games` list indexed games
+- `GET /api/games/:id` game detail
+- `GET /api/scan` latest scan job
+- `POST /api/scan` run scanner now
+- `POST /api/metadata/rematch` rematch metadata for all indexed games
+- `POST /api/games/:id/rematch` rematch one game (supports candidate offset)
+- `POST /api/games/:id/manual-map` set manual IGDB query title and rematch
+- `DELETE /api/games/:id/manual-map` clear manual title map and rematch
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+
+- Scanner now treats release **folders** as one item and standalone **archives** as one item.
+- Files inside release folders are not indexed as separate games.
+- To enable real metadata from IGDB, set:
+  - `IGDB_CLIENT_ID`
+  - `IGDB_CLIENT_SECRET`

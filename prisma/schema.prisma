@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id             String     @id @default(cuid())
+  title          String
+  slug           String     @unique
+  platform       String
+  filePath       String     @unique
+  relativePath   String
+  extension      String
+  fileSizeBytes  BigInt?
+  releaseYear    Int?
+  genres         String?
+  description    String?
+  lastSeenAt     DateTime
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  metadataSource String?
+  lastQueryUsed  String?
+  manualMapTitle     String?
+  manualSteamAppId String?
+  steamAppId       String?
+  steamTitle       String?
+  artworks       Artwork[]
+
+  @@index([steamAppId])
+}
+
+model Artwork {
+  id        String   @id @default(cuid())
+  gameId    String
+  type      String
+  url       String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@unique([gameId, type])
+}
+
+model ScanJob {
+  id          String    @id @default(cuid())
+  status      String
+  startedAt   DateTime
+  completedAt DateTime?
+  filesSeen   Int       @default(0)
+  gamesUpsert Int       @default(0)
+  errors      Int       @default(0)
+  message     String?
+}
