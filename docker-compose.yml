@@ -1,15 +1,20 @@
+# Pull-only — CI publishes the image to GHCR (.github/workflows/docker.yml).
+# Copy `.env.example` → `.env` and set GAMELIB_IMAGE + LIBRARY_HOST_PATH.
+
 services:
   gamelib:
-    build: .
+    image: ${GAMELIB_IMAGE:?Set GAMELIB_IMAGE in .env — see .env.example}
     container_name: gamelib
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       DATABASE_URL: "file:/app/data/gamelib.db"
       LIBRARY_ROOT: "/library/games"
       ART_CACHE_DIR: "/app/data/artwork"
       PORT: "3000"
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
     volumes:
       - ./data:/app/data
-      - /mnt/main/games:/library/games:ro
+      - ${LIBRARY_HOST_PATH:?Set LIBRARY_HOST_PATH in .env — see .env.example}:/library/games:ro
     restart: unless-stopped

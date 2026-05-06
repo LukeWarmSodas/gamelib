@@ -29,14 +29,20 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ## Docker / NAS
 
-1. Update `docker-compose.yml` host mount:
-   - `/mnt/nas/games:/library/games:ro`
-2. Build and run:
-   - `docker compose up -d --build`
-3. Open:
+GitHub Actions (`.github/workflows/docker.yml`) builds and pushes **`linux/amd64`** images to **GHCR**:  
+`ghcr.io/<your-github-user-or-org>/<repo-name>` (tags include `latest` on the default branch, plus semver on `v*` tags).
+
+1. On the machine that runs Compose, copy env and fill in values:
+   - `cp .env.example .env`
+   - `GAMELIB_IMAGE` — must match your GHCR image (for example `ghcr.io/my-org/gamelib:latest`).
+   - `LIBRARY_HOST_PATH` — host directory mounted read-only into the container as `/library/games`.
+2. If the package is private, log in once: `docker login ghcr.io`
+3. Pull and start:
+   - `docker compose pull && docker compose up -d`
+4. Open:
    - `http://<nas-ip>:3000`
 
-The container stores DB and art cache in `./data`.
+DB and artwork cache live under `./data` next to `docker-compose.yml`.
 
 ## API endpoints
 
