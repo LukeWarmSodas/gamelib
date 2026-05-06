@@ -29,16 +29,16 @@ export function ScanButton() {
   };
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
       <button
         type="button"
         onClick={onScan}
         disabled={running}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+        className="w-full rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 ring-1 ring-white/10 transition-all hover:bg-accent/90 hover:shadow-accent/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-55"
       >
-        {running ? "Scanning..." : "Scan Now"}
+        {running ? "Scanning…" : "Scan library"}
       </button>
-      {message ? <p className="text-xs text-muted">{message}</p> : null}
+      {message ? <p className="text-xs leading-snug text-muted">{message}</p> : null}
     </div>
   );
 }

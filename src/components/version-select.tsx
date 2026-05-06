@@ -27,8 +27,10 @@ export function VersionSelect({ currentGameId, versions }: Props) {
   }
 
   return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted">Version</p>
+    <div className="min-w-0 flex-1 space-y-2 md:max-w-md">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-faint">
+        Release version
+      </p>
       <select
         value={currentGameId}
         onChange={(e) => {
@@ -36,7 +38,7 @@ export function VersionSelect({ currentGameId, versions }: Props) {
           const segment = picked?.steamAppId ?? picked?.id ?? e.target.value;
           router.push(`/games/${segment}`);
         }}
-        className="w-full rounded-md border border-white/20 bg-black/40 px-3 py-2 text-sm outline-none focus:border-accent"
+        className="w-full cursor-pointer rounded-xl border border-border-bright bg-black/35 px-4 py-3 text-sm text-foreground shadow-inner shadow-black/20 outline-none ring-offset-background transition-colors hover:border-accent/30 focus:border-accent/50 focus:ring-2 focus:ring-accent/35"
       >
         {versions.map((version) => (
           <option key={version.id} value={version.id}>

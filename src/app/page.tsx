@@ -1,8 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { ScanButton } from "@/components/scan-button";
-import { RematchAllButton } from "@/components/rematch-all-button";
 
 export const dynamic = "force-dynamic";
 
@@ -54,76 +52,118 @@ export default async function Home() {
   const dedupedGames = Array.from(grouped.values());
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-8 md:px-8">
-      <header className="mb-8 rounded-2xl border border-white/10 bg-panel p-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-muted">GameLib</p>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Your library, your way
-            </h1>
-            <p className="mt-2 text-sm text-muted">
-              Indexed from <code className="rounded bg-black/30 px-2 py-0.5">LIBRARY_ROOT</code> for
-              fast browsing on NAS.
+    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 pb-16 pt-8 md:px-8 md:pt-10">
+      <header className="relative mb-10 overflow-hidden rounded-3xl border border-border-bright bg-panel-solid/90 p-8 shadow-2xl shadow-black/40 md:p-10">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 left-1/4 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
+        <div className="relative">
+          <div className="max-w-2xl space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted">
+              Library
             </p>
+            <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-[2.35rem] md:leading-[1.15]">
+              Your games, indexed and easy to browse
+            </h1>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="rounded-full border border-border-bright bg-white/[0.04] px-3 py-1 text-xs font-medium text-foreground/90">
+                {dedupedGames.length} titles
+              </span>
+              <span className="rounded-full border border-border-bright bg-white/[0.04] px-3 py-1 text-xs text-muted">
+                {games.length} indexed releases
+              </span>
+              {scan ? (
+                <span className="rounded-full border border-accent/25 bg-accent-dim px-3 py-1 text-xs font-medium text-accent">
+                  Last scan {scan.status} · {scan.gamesUpsert}/{scan.filesSeen}
+                </span>
+              ) : (
+                <span className="rounded-full border border-border-bright px-3 py-1 text-xs text-muted-faint">
+                  No scans yet — run one to populate
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-start gap-3">
-            <RematchAllButton />
-            <ScanButton />
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted">
-          <span>{dedupedGames.length} unique games</span>
-          <span>{games.length} files/releases indexed</span>
-          {scan ? (
-            <span>
-              Last scan: {scan.status} ({scan.gamesUpsert}/{scan.filesSeen})
-            </span>
-          ) : (
-            <span>No scans yet</span>
-          )}
         </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {dedupedGames.map((game) => {
-          const cover = game.artworks.find((a) => a.type === "cover");
-          const key = dedupeKey(game);
-          const versions = versionCounts.get(key) ?? 1;
-          const href = game.steamAppId ? `/games/${game.steamAppId}` : `/games/${game.id}`;
-          return (
+      {dedupedGames.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border-bright bg-panel-solid/40 px-8 py-16 text-center">
+          <p className="text-lg font-medium text-foreground">No games yet</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+            Open{" "}
             <Link
-              key={game.steamAppId ?? game.id}
-              href={href}
-              className="group overflow-hidden rounded-xl border border-white/10 bg-panel transition hover:-translate-y-1 hover:border-accent/70"
+              href="/settings"
+              className="font-medium text-accent underline-offset-4 hover:underline"
             >
-              <div className="aspect-[3/4] bg-black/40">
-                {cover ? (
-                  <Image
-                    src={cover.url}
-                    alt={game.title}
-                    className="h-full w-full object-cover"
-                    width={400}
-                    height={560}
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-muted">
-                    No cover
-                  </div>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="text-sm font-medium">{game.title}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {game.platform} · {formatBytes(game.fileSizeBytes)}
-                </p>
-                {versions > 1 ? <p className="text-xs text-muted">{versions} versions</p> : null}
-              </div>
-            </Link>
-          );
-        })}
-      </section>
+              Settings
+            </Link>{" "}
+            to scan your library. Covers appear when Steam matches your filenames.
+          </p>
+        </div>
+      ) : (
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+          {dedupedGames.map((game) => {
+            const cover = game.artworks.find((a) => a.type === "cover");
+            const key = dedupeKey(game);
+            const versions = versionCounts.get(key) ?? 1;
+            const href = game.steamAppId ? `/games/${game.steamAppId}` : `/games/${game.id}`;
+            return (
+              <Link
+                key={game.steamAppId ?? game.id}
+                href={href}
+                className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel-solid/85 shadow-lg shadow-black/25 ring-1 ring-white/[0.04] transition-all duration-300 hover:-translate-y-1 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5 hover:ring-accent/20"
+              >
+                <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-b from-white/[0.06] to-black/50">
+                  {cover ? (
+                    <Image
+                      src={cover.url}
+                      alt={game.title}
+                      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.045]"
+                      width={400}
+                      height={560}
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border-bright bg-white/[0.04] text-muted-faint">
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          aria-hidden
+                        >
+                          <path d="M4 16l4.5-4.5 3 3L16 9l4 4M5 19h14" />
+                        </svg>
+                      </div>
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+                        No cover
+                      </span>
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+                  {versions > 1 ? (
+                    <span className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/15 backdrop-blur-sm">
+                      {versions} versions
+                    </span>
+                  ) : null}
+                </div>
+                <div className="relative flex flex-1 flex-col p-3.5 pt-3">
+                  <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">
+                    {game.title}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    <span className="font-medium text-muted-faint">{game.platform}</span>
+                    <span className="mx-1.5 text-border-bright">·</span>
+                    {formatBytes(game.fileSizeBytes)}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+      )}
     </main>
   );
 }

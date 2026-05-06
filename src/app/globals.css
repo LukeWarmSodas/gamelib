@@ -1,27 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090c13;
-  --foreground: #e7ecff;
-  --panel: #141a26;
-  --muted: #8a96b3;
-  --accent: #6f8cff;
+  --background: #06080f;
+  --foreground: #eef1f8;
+  --panel: rgba(18, 24, 38, 0.78);
+  --panel-solid: #121826;
+  --muted: #8b97b5;
+  --muted-faint: #5c677d;
+  --accent: #7690ff;
+  --accent-dim: rgba(118, 144, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-bright: rgba(255, 255, 255, 0.12);
+  --glow-accent: rgba(118, 144, 255, 0.22);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-panel: var(--panel);
+  --color-panel-solid: var(--panel-solid);
   --color-muted: var(--muted);
+  --color-muted-faint: var(--muted-faint);
   --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-border: var(--border);
+  --color-border-bright: var(--border-bright);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background-image:
+    radial-gradient(ellipse 100% 70% at 50% -25%, var(--glow-accent), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 100% 0%, rgba(147, 112, 219, 0.06), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 0% 100%, rgba(56, 189, 248, 0.05), transparent 45%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(118, 144, 255, 0.35);
+  color: var(--foreground);
 }
 
 a {

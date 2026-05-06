@@ -33,16 +33,16 @@ export function RematchGameButton({ gameId }: Props) {
   };
 
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex min-w-[200px] flex-1 flex-col items-stretch gap-2 md:max-w-xs md:items-end">
       <button
         type="button"
         onClick={rematch}
         disabled={running}
-        className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+        className="rounded-xl border border-border-bright bg-white/[0.06] px-4 py-2.5 text-sm font-semibold transition-all hover:border-accent/35 hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-55"
       >
-        {running ? "Trying..." : "Try Next IGDB Match"}
+        {running ? "Searching…" : "Try next Steam match"}
       </button>
-      {message ? <p className="text-xs text-muted">{message}</p> : null}
+      {message ? <p className="text-xs leading-snug text-muted">{message}</p> : null}
     </div>
   );
 }

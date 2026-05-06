@@ -27,16 +27,16 @@ export function RematchAllButton() {
   };
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
       <button
         type="button"
         onClick={onRematch}
         disabled={running}
-        className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-foreground hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+        className="w-full rounded-xl border border-border-bright bg-white/[0.05] px-5 py-2.5 text-sm font-semibold text-foreground shadow-lg shadow-black/20 backdrop-blur-sm transition-all hover:border-accent/35 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-55"
       >
-        {running ? "Rematching..." : "Rematch Metadata"}
+        {running ? "Rematching…" : "Rematch metadata"}
       </button>
-      {message ? <p className="text-xs text-muted">{message}</p> : null}
+      {message ? <p className="text-xs leading-snug text-muted">{message}</p> : null}
     </div>
   );
 }
