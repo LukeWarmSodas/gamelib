@@ -11,5 +11,5 @@ services:
       PORT: "3000"
     volumes:
       - ./data:/app/data
-      - /mnt/nas/games:/library/games:ro
+      - /mnt/main/games:/library/games:ro
     restart: unless-stopped
