@@ -9,7 +9,16 @@ export async function GET() {
   return NextResponse.json(latest);
 }
 
-export async function POST() {
-  const result = await runScan();
-  return NextResponse.json(result);
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json().catch(() => ({}))) as { force?: boolean };
+    const result = await runScan({ force: Boolean(body.force) });
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Scan failed";
+    const badLibraryRoot =
+      message.includes("Cannot read library folder") ||
+      message.includes("LIBRARY_ROOT must");
+    return NextResponse.json({ message }, { status: badLibraryRoot ? 400 : 500 });
+  }
 }

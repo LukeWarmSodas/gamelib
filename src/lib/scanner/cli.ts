@@ -1,7 +1,8 @@
 import { runScan } from "@/lib/scanner";
 
 async function main() {
-  const result = await runScan();
+  const force = process.argv.includes("--force");
+  const result = await runScan({ force });
   console.log(JSON.stringify(result, null, 2));
 }
 

@@ -28,6 +28,8 @@ model Game {
   manualSteamAppId String?
   steamAppId       String?
   steamTitle       String?
+  /** mtime+size+manual mapping — when unchanged, scan skips metadata/art refresh */
+  scanContentKey   String?
   artworks       Artwork[]
 
   @@index([steamAppId])
@@ -48,12 +50,13 @@ model Artwork {
 }
 
 model ScanJob {
-  id          String    @id @default(cuid())
-  status      String
-  startedAt   DateTime
-  completedAt DateTime?
-  filesSeen   Int       @default(0)
-  gamesUpsert Int       @default(0)
-  errors      Int       @default(0)
-  message     String?
+  id           String    @id @default(cuid())
+  status       String
+  startedAt    DateTime
+  completedAt  DateTime?
+  filesSeen    Int       @default(0)
+  gamesUpsert  Int       @default(0)
+  gamesSkipped Int       @default(0)
+  errors       Int       @default(0)
+  message      String?
 }

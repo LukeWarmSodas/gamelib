@@ -14,6 +14,8 @@ services:
       PORT: "3000"
       IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
       IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      RAWG_API_KEY: ${RAWG_API_KEY:-}
+      SCAN_CRON_DISABLED: ${SCAN_CRON_DISABLED:-}
     volumes:
       - ./data:/app/data
       - ${LIBRARY_HOST_PATH:?Set LIBRARY_HOST_PATH in .env — see .env.example}:/library/games:ro

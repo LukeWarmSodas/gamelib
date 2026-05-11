@@ -1,33 +1,21 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { Stats } from "node:fs";
 import { getConfig } from "@/lib/config";
 import { prisma } from "@/lib/db";
 import { enrichGameMetadata } from "@/lib/metadata/providers";
+import { syncGameArtworks } from "@/lib/metadata/sync-artworks";
 
-const GAME_EXTENSIONS = new Set([
+/** Only these file types are indexed as games (directories are never games). */
+const ARCHIVE_EXTENSIONS = new Set([
   ".zip",
   ".7z",
+  ".rar",
   ".iso",
-  ".chd",
-  ".cue",
-  ".nes",
-  ".sfc",
-  ".smc",
-  ".gba",
-  ".gb",
-  ".gbc",
-  ".n64",
-  ".z64",
-  ".v64",
-  ".nds",
-  ".3ds",
-  ".psx",
-  ".pbp",
   ".cso",
+  ".chd",
   ".rvz",
 ]);
-
-const ARCHIVE_EXTENSIONS = new Set([".zip", ".7z", ".rar", ".iso", ".cso", ".chd", ".rvz"]);
 
 function isRepackFileName(name: string) {
   const lower = name.toLowerCase();
@@ -49,10 +37,16 @@ function isLikelyInstallerPart(name: string) {
   return false;
 }
 
-type ScanStats = {
+export type ScanStats = {
   filesSeen: number;
   gamesUpsert: number;
+  gamesSkipped: number;
   errors: number;
+};
+
+export type ScanOptions = {
+  /** Re-fetch metadata and art for every release even if filesystem + manual map unchanged */
+  force?: boolean;
 };
 
 function inferPlatform(relativePath: string): string {
@@ -63,75 +57,95 @@ function inferPlatform(relativePath: string): string {
   return parts[0];
 }
 
-async function walk(dir: string, root: string, collector: string[]) {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const isRoot = path.resolve(dir) === path.resolve(root);
-
-  const fileEntries = entries.filter((e) => e.isFile());
-  const hasArchiveInside = fileEntries.some((file) =>
-    ARCHIVE_EXTENSIONS.has(path.extname(file.name).toLowerCase()),
-  );
-  const hasSceneMarker = fileEntries.some((file) =>
-    /^sfv|^nfo|^proof/i.test(path.basename(file.name, path.extname(file.name))),
-  );
-  const hasRepackMarker = fileEntries.some((file) => isRepackFileName(file.name));
-  const hasSubdirs = entries.some((e) => e.isDirectory());
-
-  // Treat release folders as a single library item and do not descend.
-  if (!isRoot && (hasArchiveInside || hasSceneMarker || hasRepackMarker) && fileEntries.length > 0) {
-    collector.push(dir);
-    return;
-  }
-
-  // Single-level folder releases without nested folders should count as one release.
-  if (!isRoot && !hasSubdirs && fileEntries.length > 0) {
-    collector.push(dir);
-    return;
-  }
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await walk(fullPath, root, collector);
-      continue;
-    }
-    if (!entry.isFile()) {
-      continue;
-    }
-    const ext = path.extname(entry.name).toLowerCase();
-    if (isLikelyInstallerPart(entry.name)) {
-      continue;
-    }
-    if (GAME_EXTENSIONS.has(ext)) {
-      collector.push(fullPath);
-      continue;
-    }
-
-    // Treat .bin as a game file only when it appears to be paired with a .cue image.
-    if (ext === ".bin") {
-      const baseName = path.basename(entry.name, ext);
-      const cueMatch = entries.some(
-        (e) => e.isFile() && path.basename(e.name, path.extname(e.name)) === baseName && path.extname(e.name).toLowerCase() === ".cue",
+async function assertLibraryRootReadable(root: string): Promise<void> {
+  try {
+    const st = await fs.stat(root);
+    if (!st.isDirectory()) {
+      throw new Error(
+        `LIBRARY_ROOT must be a directory: ${root}\nUse a folder that contains your releases (e.g. Z:\\Games), not a single file.`,
       );
-      if (cueMatch) {
-        collector.push(fullPath);
-      }
     }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("LIBRARY_ROOT must")) {
+      throw e;
+    }
+    const win = process.platform === "win32";
+    const code =
+      e && typeof e === "object" && "code" in e ? String((e as { code?: string }).code) : "error";
+    const lines = [
+      `Cannot read library folder: ${root}`,
+      e instanceof Error ? `(${code}: ${e.message})` : String(e),
+    ];
+    if (win) {
+      lines.push(
+        "",
+        "On Windows, drive letters like Z: are per-user. If Z: works in Explorer but not here:",
+        "• Start VS Code / the terminal from the same Windows account where the drive is mapped, then run `npm run dev` again.",
+        "• Or avoid mapped letters: set LIBRARY_ROOT to a UNC path, e.g. LIBRARY_ROOT=\\\\YourNAS\\games",
+        "• Or use a local path such as C:\\Games",
+      );
+    } else {
+      lines.push("", "Check that the path exists and the process can read it.");
+    }
+    throw new Error(lines.join("\n"));
   }
 }
 
-export async function runScan(): Promise<ScanStats> {
+/** Detect added/changed releases (mtime + size + manual mapping fields). */
+function computeScanContentKey(
+  stat: Stats,
+  manualMapTitle: string | null,
+  manualSteamAppId: string | null,
+): string {
+  const dir = stat.isDirectory();
+  const sizePart = dir ? 0 : stat.size;
+  return `${Math.trunc(stat.mtimeMs)}:${sizePart}:${manualMapTitle ?? ""}:${manualSteamAppId ?? ""}`;
+}
+
+/** Archives only in the library root — subdirectories are not scanned. */
+async function collectRootArchivesOnly(root: string, collector: string[]) {
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (isLikelyInstallerPart(entry.name)) {
+      continue;
+    }
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!ARCHIVE_EXTENSIONS.has(ext)) {
+      continue;
+    }
+    collector.push(path.join(root, entry.name));
+  }
+}
+
+let scanInFlight: Promise<ScanStats> | null = null;
+
+export async function runScan(options?: ScanOptions): Promise<ScanStats> {
+  if (scanInFlight) {
+    return scanInFlight;
+  }
+  scanInFlight = runScanInternal(options).finally(() => {
+    scanInFlight = null;
+  });
+  return scanInFlight;
+}
+
+async function runScanInternal(options?: ScanOptions): Promise<ScanStats> {
+  const force = Boolean(options?.force);
   const startedAt = new Date();
   const scanJob = await prisma.scanJob.create({
     data: { status: "running", startedAt },
   });
 
-  const stats: ScanStats = { filesSeen: 0, gamesUpsert: 0, errors: 0 };
+  const stats: ScanStats = { filesSeen: 0, gamesUpsert: 0, gamesSkipped: 0, errors: 0 };
   const root = getConfig().libraryRoot;
   const releases: string[] = [];
 
   try {
-    await walk(root, root, releases);
+    await assertLibraryRootReadable(root);
+    await collectRootArchivesOnly(root, releases);
     const now = new Date();
     stats.filesSeen = releases.length;
 
@@ -143,12 +157,34 @@ export async function runScan(): Promise<ScanStats> {
         const ext = isDirectoryRelease ? ".dir" : path.extname(releasePath).toLowerCase();
         const fileName = path.basename(releasePath);
         const platform = inferPlatform(rel);
+
         const existing = await prisma.game.findUnique({
           where: { filePath: releasePath },
-          select: { manualMapTitle: true, manualSteamAppId: true },
+          select: {
+            id: true,
+            manualMapTitle: true,
+            manualSteamAppId: true,
+            scanContentKey: true,
+          },
         });
-        const querySource = existing?.manualMapTitle?.trim() || fileName;
-        const metadata = await enrichGameMetadata(querySource);
+
+        const manualMapTitle = existing?.manualMapTitle ?? null;
+        const manualSteamAppId = existing?.manualSteamAppId ?? null;
+        const contentKey = computeScanContentKey(stat, manualMapTitle, manualSteamAppId);
+
+        if (!force && existing && existing.scanContentKey === contentKey) {
+          await prisma.game.update({
+            where: { id: existing.id },
+            data: { lastSeenAt: now },
+          });
+          stats.gamesSkipped += 1;
+          continue;
+        }
+
+        const querySource = manualMapTitle?.trim() || fileName;
+        const metadata = await enrichGameMetadata(querySource, {
+          steamAppId: manualSteamAppId ?? undefined,
+        });
         const relSlug = rel.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
         const slug = `${platform}-${metadata.title}-${relSlug}`
           .toLowerCase()
@@ -172,6 +208,7 @@ export async function runScan(): Promise<ScanStats> {
             lastQueryUsed: metadata.queryUsed,
             steamAppId: metadata.steamAppId ?? null,
             steamTitle: metadata.steamTitle ?? null,
+            scanContentKey: contentKey,
             lastSeenAt: now,
           },
           create: {
@@ -191,46 +228,15 @@ export async function runScan(): Promise<ScanStats> {
             steamTitle: metadata.steamTitle ?? null,
             manualMapTitle: existing?.manualMapTitle ?? null,
             manualSteamAppId: existing?.manualSteamAppId ?? null,
+            scanContentKey: contentKey,
             lastSeenAt: now,
           },
         });
 
-        if (metadata.coverUrl) {
-          await prisma.artwork.upsert({
-            where: {
-              gameId_type: { gameId: game.id, type: "cover" },
-            },
-            update: { url: metadata.coverUrl, isPrimary: true },
-            create: {
-              gameId: game.id,
-              type: "cover",
-              url: metadata.coverUrl,
-              isPrimary: true,
-            },
-          });
-        } else {
-          await prisma.artwork.deleteMany({
-            where: { gameId: game.id, type: "cover" },
-          });
-        }
-
-        if (metadata.backdropUrl) {
-          await prisma.artwork.upsert({
-            where: {
-              gameId_type: { gameId: game.id, type: "backdrop" },
-            },
-            update: { url: metadata.backdropUrl },
-            create: {
-              gameId: game.id,
-              type: "backdrop",
-              url: metadata.backdropUrl,
-            },
-          });
-        } else {
-          await prisma.artwork.deleteMany({
-            where: { gameId: game.id, type: "backdrop" },
-          });
-        }
+        await syncGameArtworks(game.id, metadata.title, {
+          coverUrl: metadata.coverUrl,
+          backdropUrl: metadata.backdropUrl,
+        });
 
         stats.gamesUpsert += 1;
       } catch {
@@ -249,6 +255,7 @@ export async function runScan(): Promise<ScanStats> {
         completedAt: new Date(),
         filesSeen: stats.filesSeen,
         gamesUpsert: stats.gamesUpsert,
+        gamesSkipped: stats.gamesSkipped,
         errors: stats.errors,
       },
     });
@@ -260,6 +267,7 @@ export async function runScan(): Promise<ScanStats> {
         completedAt: new Date(),
         filesSeen: stats.filesSeen,
         gamesUpsert: stats.gamesUpsert,
+        gamesSkipped: stats.gamesSkipped,
         errors: stats.errors + 1,
         message: error instanceof Error ? error.message : "Unknown scan failure",
       },

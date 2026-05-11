@@ -28,16 +28,29 @@ export default async function SettingsPage() {
           Library &amp; metadata
         </h1>
         <p className="mt-3 max-w-xl text-pretty text-sm leading-relaxed text-muted md:text-[15px]">
-          Scan your configured library root to index files, then rematch to refresh Steam titles,
-          descriptions, and artwork for existing rows.
+          Incremental scans only refresh releases that were added, changed on disk, or had manual
+          mapping updated. In production the app also runs a scan once per day automatically.
+          Covers use IGDB (
+          <code className="rounded-md border border-border-bright bg-black/35 px-1.5 py-0.5 font-mono text-[12px]">
+            IGDB_CLIENT_*
+          </code>
+          ); set{" "}
+          <code className="rounded-md border border-border-bright bg-black/35 px-1.5 py-0.5 font-mono text-[12px]">
+            RAWG_API_KEY
+          </code>{" "}
+          to fill missing or failed image URLs.
         </p>
       </header>
 
       <section className="mt-10 rounded-3xl border border-border-bright bg-panel-solid/90 p-8 shadow-xl shadow-black/30 md:p-10">
         <h2 className="text-lg font-semibold text-foreground">Actions</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Scan walks <code className="rounded-md border border-border-bright bg-black/35 px-1.5 py-0.5 font-mono text-[13px]">LIBRARY_ROOT</code>{" "}
-          and upserts games. Rematch re-runs Steam metadata for titles already in the database.
+          Scan reads the root of{" "}
+          <code className="rounded-md border border-border-bright bg-black/35 px-1.5 py-0.5 font-mono text-[13px]">LIBRARY_ROOT</code>{" "}
+          only (archives there, not in subfolders) and upserts games. Use{" "}
+          <span className="font-semibold text-foreground/90">Full rescan</span> only if
+          you want every row to hit Steam again. Rematch re-runs Steam metadata for titles already
+          in the database.
         </p>
 
         {scan ? (
@@ -55,7 +68,10 @@ export default async function SettingsPage() {
               </>
             ) : null}
             {" · "}
-            {scan.gamesUpsert}/{scan.filesSeen} imported
+            {scan.gamesUpsert}/{scan.filesSeen} updated
+            {typeof scan.gamesSkipped === "number" && scan.gamesSkipped > 0
+              ? ` · ${scan.gamesSkipped} skipped`
+              : ""}
             {scan.errors ? ` (${scan.errors} errors)` : ""}
           </p>
         ) : (
@@ -64,6 +80,7 @@ export default async function SettingsPage() {
 
         <div className="mt-8 flex flex-col gap-4 border-t border-border pt-8 sm:flex-row sm:flex-wrap sm:items-start sm:gap-6">
           <ScanButton />
+          <ScanButton force label="Full rescan (all games)" />
           <RematchAllButton />
         </div>
       </section>

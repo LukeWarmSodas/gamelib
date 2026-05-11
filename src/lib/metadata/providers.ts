@@ -37,9 +37,12 @@ const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
 const LEADING_SCENE_GROUP = /^(rune|wow|tenoke|flt|codex|skidrow|razor1911|empress|p2p|goldberg|ofme|elamigos|insaneramzes)[-_. ]+/i;
 const TRAILING_TIMESTAMP = /(?:^|[ _-])\d{4}-\d{2}-\d{2}t\d{2}(?:[-:]\d{2}){2}(?:\.\d+)?z?$/i;
-/** Includes Unity/Unreal-style patch suffixes (.F1) and build tags (.R2502) after semver */
+/**
+ * Semver-ish tokens: v1.5.6.F1 / v1.42a (letter glued to last numeric segment) / 1.0.0.R2502.
+ * Trailing `(?:[a-z]\d*)?` eats patch letters like `42a` without a dot before the letter.
+ */
 const VERSION_TOKENS =
-  /\bv(?:ersion)?\s*\d+(?:[._\s]\d+)*(?:[._][a-z]\d*)?\b|\b\d+(?:[._]\d+){1,}(?:[._][a-z]\d*)?\b|\bbuild[ ._-]*\d+\b|\bearly\s*access\b/gi;
+  /\bv(?:ersion)?\s*\d+(?:[._\s]\d+)*(?:[._][a-z]\d*)?(?:[a-z]\d*)?\b|\b\d+(?:[._]\d+){1,}(?:[._][a-z]\d*)?(?:[a-z]\d*)?\b|\bbuild[ ._-]*\d+\b|\bearly\s*access\b/gi;
 const NOISE_SUFFIX =
   /(?:^|[ ._-])(?:p2p|0xdeadcode|insaneramzes|goldberg|ofme|steamrip\.com|gog|battle\.net|epic)$/i;
 const TRAILING_GROUP_TOKEN =
@@ -158,14 +161,6 @@ async function searchSteamApps(query: string): Promise<SteamSearchHit[]> {
   return data.slice(0, 20).map((item) => ({ appid: String(item.appid), name: item.name }));
 }
 
-export function steamLibraryCoverUrl(appId: string): string {
-  return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`;
-}
-
-export function steamLibraryHeroUrl(appId: string): string {
-  return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
-}
-
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -193,12 +188,6 @@ function steamDescription(details: SteamAppDetails): string | undefined {
     return stripHtml(details.about_the_game).slice(0, 8000);
   }
   return undefined;
-}
-
-function steamBackdropUrl(details: SteamAppDetails, appId: string): string | undefined {
-  const shot = details.screenshots?.[0]?.path_full?.trim();
-  if (shot) return shot;
-  return steamLibraryHeroUrl(appId);
 }
 
 async function resolveSteam(
@@ -275,6 +264,79 @@ async function getIgdbToken() {
   };
 
   return { clientId, token: data.access_token };
+}
+
+/**
+ * Resolve cover + hero/backdrop from IGDB search (first good hit per query string).
+ * Does not use Steam CDN. Optional anchor title (e.g. Steam store name) rejects weak name matches.
+ */
+export async function fetchIgdbGameArt(
+  searchQueries: string[],
+  anchorTitle?: string,
+): Promise<{ coverUrl?: string; backdropUrl?: string } | null> {
+  const auth = await getIgdbToken();
+  if (!auth) return null;
+  const anchor = anchorTitle?.trim();
+
+  const seen = new Set<string>();
+  for (const q of searchQueries) {
+    const qt = q.trim().replace(/"/g, "");
+    if (!qt) continue;
+    const key = qt.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const body = [
+      "fields name,cover.image_id,artworks.image_id;",
+      `search "${qt}";`,
+      "limit 1;",
+    ].join(" ");
+
+    const res = await fetch("https://api.igdb.com/v4/games", {
+      method: "POST",
+      headers: {
+        "Client-ID": auth.clientId,
+        Authorization: `Bearer ${auth.token}`,
+        Accept: "application/json",
+        "Content-Type": "text/plain",
+      },
+      body,
+    });
+    if (!res.ok) continue;
+
+    const games = (await res.json()) as IgdbGame[];
+    const match = games[0];
+    if (!match?.name) continue;
+    if (anchor && similarity(match.name, anchor) < 0.18) continue;
+
+    const coverUrl = imageUrl(match.cover?.image_id, "cover_big");
+    const backdropUrl = imageUrl(match.artworks?.[0]?.image_id, "screenshot_huge");
+    if (coverUrl || backdropUrl) {
+      return { coverUrl, backdropUrl };
+    }
+  }
+
+  return null;
+}
+
+function uniqueArtQueries(rawName: string, resolvedTitle: string, cleanedTitle: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (s: string) => {
+    const t = s.trim();
+    if (!t) return;
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(t);
+  };
+  push(resolvedTitle);
+  push(cleanedTitle);
+  push(rawName.trim());
+  for (const c of titleCandidates(rawName)) {
+    push(c);
+  }
+  return out.slice(0, 10);
 }
 
 export async function searchMetadataCandidates(query: string): Promise<MetadataCandidate[]> {
@@ -358,6 +420,9 @@ export async function enrichGameMetadata(
       cleanedTitle ||
       rawName.trim();
 
+    const artQueries = uniqueArtQueries(rawName, title, cleanedTitle);
+    const igdbArt = await fetchIgdbGameArt(artQueries, title);
+
     return {
       title,
       releaseYear: steamReleaseYear(details.release_date),
@@ -365,8 +430,8 @@ export async function enrichGameMetadata(
       description:
         steamDescription(details) ||
         `${title} — imported from your library; Steam metadata is partial.`,
-      coverUrl: steamLibraryCoverUrl(appId),
-      backdropUrl: steamBackdropUrl(details, appId),
+      coverUrl: igdbArt?.coverUrl,
+      backdropUrl: igdbArt?.backdropUrl,
       provider: "steam",
       queryUsed: rawName.trim(),
       steamAppId: appId,
@@ -374,13 +439,17 @@ export async function enrichGameMetadata(
     };
   }
 
+  const fallbackTitle = cleanedTitle || rawName.trim();
+  const artQueries = uniqueArtQueries(rawName, fallbackTitle, cleanedTitle);
+  const igdbArt = await fetchIgdbGameArt(artQueries, fallbackTitle);
+
   return {
-    title: cleanedTitle || rawName.trim(),
+    title: fallbackTitle,
     releaseYear: undefined,
     genres: undefined,
-    description: `${cleanedTitle || rawName} — no Steam store match yet.`,
-    coverUrl: undefined,
-    backdropUrl: undefined,
+    description: `${fallbackTitle} — no Steam store match yet.`,
+    coverUrl: igdbArt?.coverUrl,
+    backdropUrl: igdbArt?.backdropUrl,
     provider: "local",
     queryUsed: rawName.trim(),
     steamAppId: undefined,

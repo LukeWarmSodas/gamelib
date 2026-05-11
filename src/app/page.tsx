@@ -74,6 +74,9 @@ export default async function Home() {
               {scan ? (
                 <span className="rounded-full border border-accent/25 bg-accent-dim px-3 py-1 text-xs font-medium text-accent">
                   Last scan {scan.status} · {scan.gamesUpsert}/{scan.filesSeen}
+                  {typeof scan.gamesSkipped === "number" && scan.gamesSkipped > 0
+                    ? ` · ${scan.gamesSkipped} skipped`
+                    : ""}
                 </span>
               ) : (
                 <span className="rounded-full border border-border-bright px-3 py-1 text-xs text-muted-faint">
@@ -96,7 +99,7 @@ export default async function Home() {
             >
               Settings
             </Link>{" "}
-            to scan your library. Covers appear when Steam matches your filenames.
+            to scan. Put archives in the root of <code className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-xs">LIBRARY_ROOT</code> (not in subfolders). Art uses IGDB when configured.
           </p>
         </div>
       ) : (

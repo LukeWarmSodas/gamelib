@@ -4,24 +4,23 @@ Self-hosted game library frontend built with Next.js, designed for Linux/NAS Doc
 
 ### Features in this MVP
 - Fast game browsing from indexed data (SQLite)
-- IGDB-backed metadata/art enrichment with fallback metadata
+- Steam-backed IDs/text metadata; IGDB-first artwork with RAWG fallback
 - Manual scan trigger from the UI
 - Docker-first runtime model for NAS
 
 ## Local development
 
-`npm run dev` works on Windows now with defaults:
-- `DATABASE_URL=file:./dev.db`
-- `LIBRARY_ROOT=Z:\Games`
+`npm run dev` on Windows: if `.env` uses a Docker-style `DATABASE_URL` such as `file:/app/data/gamelib.db`, the app automatically uses **`file:./dev.db`** instead (see `src/lib/db.ts`). **`npm run db:push`** runs Prisma with that same rule so the schema always lands in `dev.db`.
 
-If your library is on a different path, create `.env.local` and override:
-- `LIBRARY_ROOT="Z:\\YourLibraryFolder"`
-- `DATABASE_URL="file:./dev.db"`
+Typical local values:
+- `LIBRARY_ROOT=Z:\Games` (or your mount)
+
+If your library is on a different path, override `LIBRARY_ROOT` in `.env`.
 
 Then:
 1. Generate Prisma client and push schema:
    - `npm run db:generate`
-   - `npm run db:push`
+   - `npm run db:push` (required after pulling schema changes)
 2. Start app:
    - `npm run dev`
 
@@ -44,12 +43,19 @@ GitHub Actions (`.github/workflows/docker.yml`) builds and pushes **`linux/amd64
 
 DB and artwork cache live under `./data` next to `docker-compose.yml`.
 
+## Library scans
+
+- **Incremental** (default): metadata and art refresh only when a release’s mtime/size changes or manual mapping changes. Deleted paths are still removed when they disappear from the tree.
+- **Full**: `POST /api/scan` with JSON `{ "force": true }`, the **Full rescan** control in Settings, or `npm run scan -- --force`.
+- **Daily** (production only): a scan runs about one minute after `next start`, then every 24 hours. Set `SCAN_CRON_DISABLED=1` to disable.
+- **Artwork**: IGDB (Twitch credentials) first; **RAWG** (optional `RAWG_API_KEY`) fills missing or broken (4xx/5xx) cover/backdrop URLs. Steam CDN is not used for library images.
+
 ## API endpoints
 
 - `GET /api/games` list indexed games
 - `GET /api/games/:id` game detail
 - `GET /api/scan` latest scan job
-- `POST /api/scan` run scanner now
+- `POST /api/scan` run scanner (JSON body optional: `{ "force": true }` for a full rescan; response includes `gamesSkipped` for incremental runs)
 - `POST /api/metadata/rematch` rematch metadata for all indexed games
 - `POST /api/games/:id/rematch` rematch one game (supports candidate offset)
 - `POST /api/games/:id/manual-map` set manual IGDB query title and rematch
@@ -57,8 +63,7 @@ DB and artwork cache live under `./data` next to `docker-compose.yml`.
 
 ## Notes
 
-- Scanner now treats release **folders** as one item and standalone **archives** as one item.
-- Files inside release folders are not indexed as separate games.
+- Scanner indexes **archive files only** in the **root** of `LIBRARY_ROOT` (`.zip`, `.7z`, `.rar`, `.iso`, `.cso`, `.chd`, `.rvz`). Subfolders are ignored — put releases flat in that directory (or point `LIBRARY_ROOT` at a flat folder).
 - To enable real metadata from IGDB, set:
   - `IGDB_CLIENT_ID`
   - `IGDB_CLIENT_SECRET`

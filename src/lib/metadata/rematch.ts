@@ -1,6 +1,7 @@
 import path from "node:path";
 import { prisma } from "@/lib/db";
 import { enrichGameMetadata } from "@/lib/metadata/providers";
+import { syncGameArtworks } from "@/lib/metadata/sync-artworks";
 
 function sourceNameFromPath(filePath: string) {
   return path.basename(filePath);
@@ -35,28 +36,10 @@ export async function rematchSingleGame(gameId: string, candidateOffset = 0) {
     },
   });
 
-  if (metadata.coverUrl) {
-    await prisma.artwork.upsert({
-      where: { gameId_type: { gameId: game.id, type: "cover" } },
-      update: { url: metadata.coverUrl, isPrimary: true },
-      create: { gameId: game.id, type: "cover", url: metadata.coverUrl, isPrimary: true },
-    });
-  } else {
-    await prisma.artwork.deleteMany({
-      where: { gameId: game.id, type: "cover" },
-    });
-  }
-  if (metadata.backdropUrl) {
-    await prisma.artwork.upsert({
-      where: { gameId_type: { gameId: game.id, type: "backdrop" } },
-      update: { url: metadata.backdropUrl },
-      create: { gameId: game.id, type: "backdrop", url: metadata.backdropUrl },
-    });
-  } else {
-    await prisma.artwork.deleteMany({
-      where: { gameId: game.id, type: "backdrop" },
-    });
-  }
+  await syncGameArtworks(game.id, metadata.title, {
+    coverUrl: metadata.coverUrl,
+    backdropUrl: metadata.backdropUrl,
+  });
 
   return {
     id: updated.id,
