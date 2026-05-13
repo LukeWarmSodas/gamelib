@@ -37,6 +37,8 @@ const EDITION_MARKER =
 const MATCH_STOP_WORDS = new Set(["the", "and", "for", "with", "from"]);
 const BASE_MATCH_WEIGHT = 0.7;
 const FULL_MATCH_WEIGHT = 0.3;
+const SEQUENCE_NUMBER_TOKEN = /^\d{1,4}$/;
+const SEQUENCE_ROMAN_TOKEN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -171,7 +173,7 @@ function trailingSequenceToken(value: string) {
   const tokens = matchTokens(value);
   const last = tokens.at(-1);
   if (!last) return null;
-  if (/^(?:\d{1,4}|[ivxlcdm]+)$/i.test(last)) {
+  if (SEQUENCE_NUMBER_TOKEN.test(last) || SEQUENCE_ROMAN_TOKEN.test(last)) {
     return last.toLowerCase();
   }
   return null;
