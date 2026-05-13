@@ -41,7 +41,7 @@ const BASE_MATCH_WEIGHT = 0.7;
 const FULL_MATCH_WEIGHT = 0.3;
 const MIN_STEAM_MATCH_THRESHOLD = 0.75;
 const SEQUENCE_NUMBER_PATTERN = /^\d{1,4}$/;
-// Canonical Roman numeral pattern for values 1-3999.
+// Canonical Roman numeral pattern for values 1-3999; case-insensitive so sequel tags like `ii` still match.
 const SEQUENCE_ROMAN_PATTERN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;

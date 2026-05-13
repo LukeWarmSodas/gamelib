@@ -36,6 +36,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const artworkData = {
     url: url.toString(),
+    // Only cover art is treated as the primary library image; backdrops stay secondary artwork.
     isPrimary: type === "cover",
   };
 
