@@ -2,21 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { findGameByRouteParam } from "@/lib/game-route";
+import { normalizeGroupTitle } from "@/lib/group-title";
 import { ArtworkImage } from "@/components/artwork-image";
+import { DeleteArchiveSection } from "@/components/delete-archive-section";
 import { RematchGameButton } from "@/components/rematch-game-button";
 import { ManualRemapForm } from "@/components/manual-remap-form";
 import { VersionSelect } from "@/components/version-select";
 
 type Params = { params: Promise<{ id: string }> };
 export const dynamic = "force-dynamic";
-
-function normalizeGroupTitle(title: string) {
-  return title
-    .toLowerCase()
-    .replace(/\b(deluxe|ultimate|premium|complete|edition|early access)\b/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
 
 function prettyDate(value: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -208,6 +202,11 @@ export default async function GameDetailPage({ params }: Params) {
               gameId={game.id}
               initialValue={game.manualMapTitle}
               currentTitle={game.title}
+            />
+
+            <DeleteArchiveSection
+              currentGameId={game.id}
+              versions={versions.map((v) => ({ id: v.id, relativePath: v.relativePath }))}
             />
 
             <div>

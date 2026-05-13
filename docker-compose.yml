@@ -5,6 +5,7 @@ services:
   gamelib:
     image: ${GAMELIB_IMAGE:?Set GAMELIB_IMAGE in .env — see .env.example}
     container_name: gamelib
+    user: 0:0
     ports:
       - "${PORT:-3000}:3000"
     environment:
