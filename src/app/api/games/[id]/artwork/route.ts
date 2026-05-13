@@ -31,17 +31,18 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ message: "Game not found" }, { status: 404 });
   }
 
+  const artworkData = {
+    url: url.toString(),
+    ...(type === "cover" ? { isPrimary: true } : {}),
+  };
+
   const saved = await prisma.artwork.upsert({
     where: { gameId_type: { gameId: id, type } },
-    update: {
-      url: url.toString(),
-      ...(type === "cover" ? { isPrimary: true } : {}),
-    },
+    update: artworkData,
     create: {
       gameId: id,
       type,
-      url: url.toString(),
-      ...(type === "cover" ? { isPrimary: true } : {}),
+      ...artworkData,
     },
   });
 

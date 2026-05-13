@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArtworkImage } from "@/components/artwork-image";
 
@@ -26,6 +27,7 @@ export function MetadataArtworkChooser({
   currentCoverUrl,
   currentBackdropUrl,
 }: Props) {
+  const router = useRouter();
   const [query, setQuery] = useState(defaultQuery);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState<`${ArtworkType}:${string}` | null>(null);
@@ -65,7 +67,7 @@ export function MetadataArtworkChooser({
         throw new Error(err.message ?? "save failed");
       }
       setMessage(`Updated ${type} artwork from ${title}.`);
-      window.location.reload();
+      router.refresh();
     } catch (error) {
       setMessage(`Artwork update failed: ${error instanceof Error ? error.message : "unknown error"}`);
     } finally {
