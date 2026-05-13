@@ -18,6 +18,7 @@ export type MetadataCandidate = {
   title: string;
   source: "igdb" | "steam";
   coverUrl?: string;
+  backdropUrl?: string;
   year?: number;
   steamAppId?: string;
 };
@@ -31,7 +32,17 @@ const QUALITY_TAGS =
   /\b(internal|retail|crackfix|dirfix|dodi|fitgirl|elamigos|portable|rip|multi\d+|dlc|bonus)\b/gi;
 /** Strip common deluxe/ultimate strings so IGDB queries match base game titles */
 const EDITION_FLUFF =
-  /\b(ultimate|deluxe|premium|gold|definitive|complete)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
+  /\b(ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
+const EDITION_MARKER =
+  /\b(?:ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/i;
+const MATCH_STOP_WORDS = new Set(["the", "and", "for", "with", "from"]);
+const MIN_SIGNIFICANT_TOKEN_LENGTH = 2;
+const BASE_MATCH_WEIGHT = 0.7;
+const FULL_MATCH_WEIGHT = 0.3;
+const MIN_STEAM_MATCH_THRESHOLD = 0.75;
+const SEQUENCE_NUMBER_PATTERN = /^\d{1,4}$/;
+// Canonical Roman numeral pattern for values 1-3999; case-insensitive so sequel tags like `ii` still match.
+const SEQUENCE_ROMAN_PATTERN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -148,6 +159,53 @@ function similarity(a: string, b: string) {
   return inter.length / union.size;
 }
 
+function stripEditionMarkers(value: string) {
+  return value.replace(EDITION_FLUFF, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+function matchTokens(value: string) {
+  return normalizeForSimilarity(stripEditionMarkers(value)).split(" ").filter(Boolean);
+}
+
+function significantTokens(value: string) {
+  return matchTokens(value).filter(
+    (token) => token.length > MIN_SIGNIFICANT_TOKEN_LENGTH && !MATCH_STOP_WORDS.has(token),
+  );
+}
+
+function trailingSequenceToken(value: string) {
+  const tokens = matchTokens(value);
+  const last = tokens.at(-1);
+  if (!last) return null;
+  if (SEQUENCE_NUMBER_PATTERN.test(last) || SEQUENCE_ROMAN_PATTERN.test(last)) {
+    return last.toLowerCase();
+  }
+  return null;
+}
+
+function scoreSteamMatch(query: string, hitName: string) {
+  if (!query.trim() || !hitName.trim()) return 0;
+  if (!EDITION_MARKER.test(query) && EDITION_MARKER.test(hitName)) {
+    return 0;
+  }
+
+  const querySeq = trailingSequenceToken(query);
+  const hitSeq = trailingSequenceToken(hitName);
+  if (querySeq !== hitSeq) {
+    return 0;
+  }
+
+  const queryWords = significantTokens(query);
+  const hitWords = new Set(significantTokens(hitName));
+  if (queryWords.length && queryWords.some((word) => !hitWords.has(word))) {
+    return 0;
+  }
+
+  const baseScore = similarity(stripEditionMarkers(query), stripEditionMarkers(hitName));
+  const fullScore = similarity(query, hitName);
+  return baseScore * BASE_MATCH_WEIGHT + fullScore * FULL_MATCH_WEIGHT;
+}
+
 async function searchSteamApps(query: string): Promise<SteamSearchHit[]> {
   const res = await fetch(
     `https://steamcommunity.com/actions/SearchApps/${encodeURIComponent(query)}`,
@@ -207,13 +265,13 @@ async function resolveSteam(
     let best: SteamSearchHit | null = null;
     let bestScore = 0;
     for (const hit of hits) {
-      const score = similarity(candidate, hit.name);
+      const score = scoreSteamMatch(candidate, hit.name);
       if (score > bestScore) {
         bestScore = score;
         best = hit;
       }
     }
-    if (best && bestScore >= 0.5) {
+    if (best && bestScore >= MIN_STEAM_MATCH_THRESHOLD) {
       steamSearchCache.set(cacheKey, best.appid);
       return { appId: best.appid, title: best.name };
     }
@@ -348,7 +406,7 @@ export async function searchMetadataCandidates(query: string): Promise<MetadataC
   const auth = await getIgdbToken();
   if (auth) {
     const igdbQuery = [
-      "fields name,first_release_date,cover.image_id;",
+      "fields name,first_release_date,cover.image_id,artworks.image_id;",
       `search "${clean.replace(/"/g, "")}";`,
       "limit 8;",
     ].join(" ");
@@ -373,6 +431,7 @@ export async function searchMetadataCandidates(query: string): Promise<MetadataC
           title: game.name,
           source: "igdb",
           coverUrl: imageUrl(game.cover?.image_id, "cover_big"),
+          backdropUrl: imageUrl(game.artworks?.[0]?.image_id, "screenshot_huge"),
           year: game.first_release_date
             ? new Date(game.first_release_date * 1000).getUTCFullYear()
             : undefined,

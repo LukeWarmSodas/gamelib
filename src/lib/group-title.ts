@@ -2,7 +2,7 @@
 export function normalizeGroupTitle(title: string): string {
   return title
     .toLowerCase()
-    .replace(/\b(deluxe|ultimate|premium|complete|edition|early access)\b/g, "")
+    .replace(/\b(deluxe|ultimate|premium|complete|definitive|special|edition|goty|early access)\b/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
