@@ -27,6 +27,11 @@ function previewFrameClass(type: ArtworkType) {
     : "relative aspect-[16/9] overflow-hidden rounded-lg bg-black/30";
 }
 
+async function extractErrorMessage(res: Response) {
+  const err = (await res.json().catch(() => ({}))) as { message?: string };
+  return err.message ?? res.statusText ?? "save failed";
+}
+
 export function MetadataArtworkChooser({
   gameId,
   defaultQuery,
@@ -69,8 +74,7 @@ export function MetadataArtworkChooser({
         body: JSON.stringify({ type, url }),
       });
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(err.message ?? res.statusText ?? "save failed");
+        throw new Error(await extractErrorMessage(res));
       }
       setMessage(`Updated ${type} artwork from ${title}.`);
       router.refresh();

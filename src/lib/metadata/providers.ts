@@ -40,9 +40,9 @@ const MIN_SIGNIFICANT_TOKEN_LENGTH = 2;
 const BASE_MATCH_WEIGHT = 0.7;
 const FULL_MATCH_WEIGHT = 0.3;
 const MIN_STEAM_MATCH_THRESHOLD = 0.75;
-const SEQUENCE_NUMBER_TOKEN = /^\d{1,4}$/;
+const SEQUENCE_NUMBER_PATTERN = /^\d{1,4}$/;
 // Canonical Roman numeral pattern for values 1-3999.
-const SEQUENCE_ROMAN_TOKEN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
+const SEQUENCE_ROMAN_PATTERN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -177,7 +177,7 @@ function trailingSequenceToken(value: string) {
   const tokens = matchTokens(value);
   const last = tokens.at(-1);
   if (!last) return null;
-  if (SEQUENCE_NUMBER_TOKEN.test(last) || SEQUENCE_ROMAN_TOKEN.test(last)) {
+  if (SEQUENCE_NUMBER_PATTERN.test(last) || SEQUENCE_ROMAN_PATTERN.test(last)) {
     return last.toLowerCase();
   }
   return null;
