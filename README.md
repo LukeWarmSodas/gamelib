@@ -21,6 +21,7 @@ Then:
 1. Generate Prisma client and push schema:
    - `npm run db:generate`
    - `npm run db:push` (required after pulling schema changes)
+   - If `prisma generate` fails with missing `runtime/...wasm` or `library.js`, stop the dev server, run `npm install`, then `npm run db:generate` again. **`prisma` and `@prisma/client` must be the same version** (see `package.json`).
 2. Start app:
    - `npm run dev`
 
@@ -48,7 +49,7 @@ DB and artwork cache live under `./data` next to `docker-compose.yml`.
 - **Incremental** (default): metadata and art refresh only when a release’s mtime/size changes or manual mapping changes. Deleted paths are still removed when they disappear from the tree.
 - **Full**: `POST /api/scan` with JSON `{ "force": true }`, the **Full rescan** control in Settings, or `npm run scan -- --force`.
 - **Daily** (production only): a scan runs about one minute after `next start`, then every 24 hours. Set `SCAN_CRON_DISABLED=1` to disable.
-- **Artwork**: IGDB (Twitch credentials) first; **RAWG** (optional `RAWG_API_KEY`) fills missing or broken (4xx/5xx) cover/backdrop URLs. Steam CDN is not used for library images.
+- **Artwork**: IGDB first; **RAWG** (`RAWG_API_KEY`) fills gaps on the server and in the **browser** when an image fails to load (so IGDB CDN quirks still get a second chance). Steam CDN is not used for library images.
 
 ## API endpoints
 

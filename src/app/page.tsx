@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { ArtworkImage } from "@/components/artwork-image";
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +105,7 @@ export default async function Home() {
       ) : (
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
           {dedupedGames.map((game) => {
-            const cover = game.artworks.find((a) => a.type === "cover");
+            const cover = game.artworks.find((a: { type: string }) => a.type === "cover");
             const key = dedupeKey(game);
             const versions = versionCounts.get(key) ?? 1;
             const href = game.steamAppId ? `/games/${game.steamAppId}` : `/games/${game.id}`;
@@ -116,35 +116,14 @@ export default async function Home() {
                 className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel-solid/85 shadow-lg shadow-black/25 ring-1 ring-white/[0.04] transition-all duration-300 hover:-translate-y-1 hover:border-accent/35 hover:shadow-xl hover:shadow-accent/5 hover:ring-accent/20"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-b from-white/[0.06] to-black/50">
-                  {cover ? (
-                    <Image
-                      src={cover.url}
-                      alt={game.title}
-                      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.045]"
-                      width={400}
-                      height={560}
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border-bright bg-white/[0.04] text-muted-faint">
-                        <svg
-                          width="22"
-                          height="22"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          aria-hidden
-                        >
-                          <path d="M4 16l4.5-4.5 3 3L16 9l4 4M5 19h14" />
-                        </svg>
-                      </div>
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
-                        No cover
-                      </span>
-                    </div>
-                  )}
+                  <ArtworkImage
+                    src={cover?.url}
+                    alt={game.title}
+                    fallbackQuery={game.title}
+                    width={400}
+                    height={560}
+                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.045]"
+                  />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
                   {versions > 1 ? (
                     <span className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/15 backdrop-blur-sm">

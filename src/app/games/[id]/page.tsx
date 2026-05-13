@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { findGameByRouteParam } from "@/lib/game-route";
+import { ArtworkImage } from "@/components/artwork-image";
 import { RematchGameButton } from "@/components/rematch-game-button";
 import { ManualRemapForm } from "@/components/manual-remap-form";
 import { VersionSelect } from "@/components/version-select";
@@ -42,9 +42,17 @@ export default async function GameDetailPage({ params }: Params) {
     redirect(`/games/${game.steamAppId}`);
   }
 
-  const cover = game.artworks.find((a) => a.type === "cover");
-  const backdrop = game.artworks.find((a) => a.type === "backdrop");
-  const versionsRaw = await prisma.game.findMany({
+  const cover = game.artworks.find((a: { type: string }) => a.type === "cover");
+  const backdrop = game.artworks.find((a: { type: string }) => a.type === "backdrop");
+
+  type VersionRow = {
+    id: string;
+    title: string;
+    relativePath: string;
+    updatedAt: Date;
+    steamAppId: string | null;
+  };
+  const versionsRaw = (await prisma.game.findMany({
     where: {
       platform: game.platform,
       ...(game.steamAppId ? { steamAppId: game.steamAppId } : {}),
@@ -57,7 +65,7 @@ export default async function GameDetailPage({ params }: Params) {
       updatedAt: true,
       steamAppId: true,
     },
-  });
+  })) as VersionRow[];
   const versions = game.steamAppId
     ? versionsRaw
     : versionsRaw.filter(
@@ -84,15 +92,22 @@ export default async function GameDetailPage({ params }: Params) {
       <article className="mt-6 overflow-hidden rounded-3xl border border-border-bright bg-panel-solid/90 shadow-2xl shadow-black/35 ring-1 ring-white/[0.04]">
         <div className="relative h-[min(22rem,52vw)] min-h-[220px] w-full overflow-hidden bg-gradient-to-br from-accent/10 via-panel-solid to-black md:h-80">
           {backdrop ? (
-            <Image
+            <ArtworkImage
               src={backdrop.url}
               alt=""
-              role="presentation"
-              className="h-full w-full object-cover"
+              fallbackQuery={game.title}
               fill
               sizes="100vw"
               priority
-              unoptimized
+              className="h-full w-full object-cover"
+              placeholder={
+                <div
+                  className="absolute inset-0 opacity-40"
+                  style={{
+                    backgroundImage: `radial-gradient(circle at 30% 20%, rgba(118,144,255,0.25), transparent 45%), radial-gradient(circle at 80% 80%, rgba(139,92,246,0.12), transparent 40%)`,
+                  }}
+                />
+              }
             />
           ) : (
             <div
@@ -146,23 +161,22 @@ export default async function GameDetailPage({ params }: Params) {
         <div className="grid gap-8 p-6 md:grid-cols-[min(220px,40%)_1fr] md:gap-10 md:p-10">
           <div className="mx-auto w-full max-w-[240px] shrink-0 md:mx-0 md:-mt-28 md:max-w-none md:self-start">
             <div className="overflow-hidden rounded-2xl border border-border-bright bg-black/40 shadow-2xl shadow-black/50 ring-2 ring-white/[0.06]">
-              {cover ? (
-                <Image
-                  src={cover.url}
-                  alt={`${game.title} cover`}
-                  className="aspect-[3/4] h-auto w-full object-cover"
-                  width={460}
-                  height={690}
-                  priority
-                  unoptimized
-                />
-              ) : (
-                <div className="flex aspect-[3/4] flex-col items-center justify-center gap-2 bg-gradient-to-b from-white/[0.04] to-black/40 p-6 text-center">
-                  <span className="text-xs font-medium uppercase tracking-wider text-muted">
-                    No cover art
-                  </span>
-                </div>
-              )}
+              <ArtworkImage
+                src={cover?.url}
+                alt={`${game.title} cover`}
+                fallbackQuery={game.title}
+                width={460}
+                height={690}
+                priority
+                className="aspect-[3/4] h-auto w-full object-cover"
+                placeholder={
+                  <div className="flex aspect-[3/4] flex-col items-center justify-center gap-2 bg-gradient-to-b from-white/[0.04] to-black/40 p-6 text-center">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                      No cover art
+                    </span>
+                  </div>
+                }
+              />
             </div>
           </div>
 

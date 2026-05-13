@@ -1,13 +1,6 @@
+import { getRawgBackgroundImageUrl } from "@/lib/metadata/rawg";
+
 const UA = "GameLib/1.0 (metadata)";
-
-type RawgGameHit = {
-  name?: string;
-  background_image?: string | null;
-};
-
-type RawgSearchResponse = {
-  results?: RawgGameHit[];
-};
 
 async function fetchWithTimeout(
   url: string,
@@ -49,20 +42,6 @@ export async function isArtworkUrlBroken(url: string): Promise<boolean> {
   }
 }
 
-async function rawgFirstHit(searchTitle: string): Promise<RawgGameHit | null> {
-  const key = process.env.RAWG_API_KEY?.trim();
-  if (!key) return null;
-  const q = searchTitle.trim().replace(/"/g, "");
-  if (!q) return null;
-  const url = `https://api.rawg.io/api/games?search=${encodeURIComponent(q)}&page_size=1&key=${encodeURIComponent(key)}`;
-  const res = await fetchWithTimeout(url, { method: "GET" });
-  if (!res.ok) return null;
-  const data = (await res.json()) as RawgSearchResponse;
-  const hit = data.results?.[0];
-  if (!hit?.background_image?.trim()) return null;
-  return hit;
-}
-
 /**
  * After enrich picks IGDB image URLs, fills gaps: missing slot or 4xx/5xx → RAWG first hit
  * (`background_image`) when RAWG_API_KEY is set.
@@ -81,8 +60,7 @@ export async function resolveArtworkUrls(
     return { coverUrl, backdropUrl };
   }
 
-  const rawg = await rawgFirstHit(displayTitle);
-  const fallback = rawg?.background_image?.trim();
+  const fallback = await getRawgBackgroundImageUrl(displayTitle);
   if (!fallback) {
     return { coverUrl, backdropUrl };
   }
