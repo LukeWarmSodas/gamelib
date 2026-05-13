@@ -35,9 +35,12 @@ const EDITION_FLUFF =
 const EDITION_MARKER =
   /\b(?:ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/i;
 const MATCH_STOP_WORDS = new Set(["the", "and", "for", "with", "from"]);
+const MIN_SIGNIFICANT_TOKEN_LENGTH = 2;
 const BASE_MATCH_WEIGHT = 0.7;
 const FULL_MATCH_WEIGHT = 0.3;
+const MIN_STEAM_MATCH_THRESHOLD = 0.75;
 const SEQUENCE_NUMBER_TOKEN = /^\d{1,4}$/;
+// Canonical Roman numeral pattern for values 1-3999.
 const SEQUENCE_ROMAN_TOKEN = /^(?=[ivxlcdm]+$)m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})$/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
@@ -165,7 +168,7 @@ function matchTokens(value: string) {
 
 function significantTokens(value: string) {
   return matchTokens(value).filter(
-    (token) => token.length > 2 && !MATCH_STOP_WORDS.has(token),
+    (token) => token.length > MIN_SIGNIFICANT_TOKEN_LENGTH && !MATCH_STOP_WORDS.has(token),
   );
 }
 
@@ -267,7 +270,7 @@ async function resolveSteam(
         best = hit;
       }
     }
-    if (best && bestScore >= 0.75) {
+    if (best && bestScore >= MIN_STEAM_MATCH_THRESHOLD) {
       steamSearchCache.set(cacheKey, best.appid);
       return { appId: best.appid, title: best.name };
     }
