@@ -21,6 +21,12 @@ type Props = {
 
 type ArtworkType = "cover" | "backdrop";
 
+function previewFrameClass(type: ArtworkType) {
+  return type === "cover"
+    ? "relative aspect-[3/4] overflow-hidden rounded-lg bg-black/30"
+    : "relative aspect-[16/9] overflow-hidden rounded-lg bg-black/30";
+}
+
 export function MetadataArtworkChooser({
   gameId,
   defaultQuery,
@@ -64,7 +70,7 @@ export function MetadataArtworkChooser({
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { message?: string };
-        throw new Error(err.message ?? "save failed");
+        throw new Error(err.message ?? res.statusText ?? "save failed");
       }
       setMessage(`Updated ${type} artwork from ${title}.`);
       router.refresh();
@@ -95,7 +101,7 @@ export function MetadataArtworkChooser({
             <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-faint">
               {item.label}
             </p>
-            <div className={item.type === "cover" ? "relative aspect-[3/4] overflow-hidden rounded-lg bg-black/30" : "relative aspect-[16/9] overflow-hidden rounded-lg bg-black/30"}>
+            <div className={previewFrameClass(item.type)}>
               <ArtworkImage
                 src={item.url}
                 alt={item.label}

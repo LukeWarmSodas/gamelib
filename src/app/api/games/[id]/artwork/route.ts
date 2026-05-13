@@ -7,7 +7,10 @@ const ALLOWED_TYPES = new Set(["cover", "backdrop"]);
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const body = (await request.json().catch(() => ({}))) as { type?: string; url?: string };
+  const body = (await request.json().catch(() => null)) as { type?: string; url?: string } | null;
+  if (!body) {
+    return NextResponse.json({ message: "Invalid JSON payload" }, { status: 400 });
+  }
   const type = body.type?.trim() ?? "";
   const rawUrl = body.url?.trim() ?? "";
 
