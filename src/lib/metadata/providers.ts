@@ -34,6 +34,9 @@ const EDITION_FLUFF =
   /\b(ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
 const EDITION_MARKER =
   /\b(?:ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/i;
+const MATCH_STOP_WORDS = new Set(["the", "and", "for", "with", "from"]);
+const BASE_MATCH_WEIGHT = 0.7;
+const FULL_MATCH_WEIGHT = 0.3;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -160,7 +163,7 @@ function matchTokens(value: string) {
 
 function significantTokens(value: string) {
   return matchTokens(value).filter(
-    (token) => token.length > 2 && !["the", "and", "for", "with", "from"].includes(token),
+    (token) => token.length > 2 && !MATCH_STOP_WORDS.has(token),
   );
 }
 
@@ -194,7 +197,7 @@ function scoreSteamMatch(query: string, hitName: string) {
 
   const baseScore = similarity(stripEditionMarkers(query), stripEditionMarkers(hitName));
   const fullScore = similarity(query, hitName);
-  return baseScore * 0.7 + fullScore * 0.3;
+  return baseScore * BASE_MATCH_WEIGHT + fullScore * FULL_MATCH_WEIGHT;
 }
 
 async function searchSteamApps(query: string): Promise<SteamSearchHit[]> {
