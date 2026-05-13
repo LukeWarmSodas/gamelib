@@ -31,7 +31,7 @@ const QUALITY_TAGS =
   /\b(internal|retail|crackfix|dirfix|dodi|fitgirl|elamigos|portable|rip|multi\d+|dlc|bonus)\b/gi;
 /** Strip common deluxe/ultimate strings so IGDB queries match base game titles */
 const EDITION_FLUFF =
-  /\b(ultimate|deluxe|premium|gold|definitive|complete)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
+  /\b(ultimate|deluxe|premium|gold|definitive|complete|legendary|anniversary|enhanced)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b|\bdirectors?\s*cut\b|\bcollectors?\s*edition\b|\bspecial\s+edition\b|\bredux\b|\bremastered?\b/gi;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -57,7 +57,7 @@ type IgdbGame = {
   artworks?: Array<{ image_id?: string }>;
 };
 
-type SteamSearchHit = { appid: string; name: string };
+import { pickBestSteamHit, rankSteamHitsForSearch, type SteamSearchHit } from "./steam-title-match";
 type SteamAppDetails = {
   name?: string;
   short_description?: string;
@@ -158,7 +158,7 @@ async function searchSteamApps(query: string): Promise<SteamSearchHit[]> {
   if (!res.ok) return [];
   const data = (await res.json()) as Array<{ appid: string | number; name: string }>;
   if (!Array.isArray(data)) return [];
-  return data.slice(0, 20).map((item) => ({ appid: String(item.appid), name: item.name }));
+  return data.slice(0, 25).map((item) => ({ appid: String(item.appid), name: item.name }));
 }
 
 function stripHtml(html: string): string {
@@ -194,9 +194,14 @@ async function resolveSteam(
   rawName: string,
   candidateOffset = 0,
 ): Promise<{ appId?: string; title?: string }> {
+  const prettyLib = prettyTitle(rawName);
   const candidates = titleCandidates(rawName).slice(candidateOffset, candidateOffset + 4);
+  /** Bumped when Steam matching heuristics change (invalidates old cached picks). */
+  const cachePrefix = "v5:";
+  const minSteamPickScore = 0.46;
+
   for (const candidate of candidates) {
-    const cacheKey = candidate.toLowerCase();
+    const cacheKey = `${cachePrefix}${candidate.toLowerCase()}`;
     if (steamSearchCache.has(cacheKey)) {
       const cached = steamSearchCache.get(cacheKey);
       if (cached) return { appId: cached };
@@ -204,25 +209,17 @@ async function resolveSteam(
     }
 
     const hits = await searchSteamApps(candidate);
-    let best: SteamSearchHit | null = null;
-    let bestScore = 0;
-    for (const hit of hits) {
-      const score = similarity(candidate, hit.name);
-      if (score > bestScore) {
-        bestScore = score;
-        best = hit;
-      }
-    }
-    if (best && bestScore >= 0.5) {
-      steamSearchCache.set(cacheKey, best.appid);
-      return { appId: best.appid, title: best.name };
+    const { hit, score } = pickBestSteamHit(candidate, rawName, prettyLib, hits);
+    if (hit && score >= minSteamPickScore) {
+      steamSearchCache.set(cacheKey, hit.appid);
+      return { appId: hit.appid, title: hit.name };
     }
     steamSearchCache.set(cacheKey, null);
   }
   return {};
 }
 
-async function fetchSteamAppDetails(appId: string): Promise<SteamAppDetails | null> {
+export async function fetchSteamAppDetails(appId: string): Promise<SteamAppDetails | null> {
   const res = await fetch(
     `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&l=en`,
   );
@@ -381,8 +378,9 @@ export async function searchMetadataCandidates(query: string): Promise<MetadataC
     }
   }
 
-  const steamHits = await searchSteamApps(clean);
-  for (const hit of steamHits.slice(0, 8)) {
+  const steamHitsRaw = await searchSteamApps(clean);
+  const steamHits = rankSteamHitsForSearch(clean, clean, prettyTitle(clean), steamHitsRaw).slice(0, 8);
+  for (const hit of steamHits) {
     const key = `steam:${hit.name.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
