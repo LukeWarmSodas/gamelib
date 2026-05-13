@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const artworkData = {
     url: url.toString(),
-    ...(type === "cover" ? { isPrimary: true } : {}),
+    isPrimary: type === "cover",
   };
 
   const saved = await prisma.artwork.upsert({

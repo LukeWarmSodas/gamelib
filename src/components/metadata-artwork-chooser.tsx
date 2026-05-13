@@ -50,7 +50,7 @@ export function MetadataArtworkChooser({
     setMessage(null);
     try {
       const res = await fetch(`/api/metadata/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error("search failed");
+      if (!res.ok) throw new Error(await extractErrorMessage(res));
       const data = (await res.json()) as Candidate[];
       setResults(data);
       if (!data.some((candidate) => candidate.coverUrl || candidate.backdropUrl)) {
