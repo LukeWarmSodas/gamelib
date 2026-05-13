@@ -31,7 +31,9 @@ const QUALITY_TAGS =
   /\b(internal|retail|crackfix|dirfix|dodi|fitgirl|elamigos|portable|rip|multi\d+|dlc|bonus)\b/gi;
 /** Strip common deluxe/ultimate strings so IGDB queries match base game titles */
 const EDITION_FLUFF =
-  /\b(ultimate|deluxe|premium|gold|definitive|complete)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
+  /\b(ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/gi;
+const EDITION_MARKER =
+  /\b(?:ultimate|deluxe|premium|gold|definitive|complete|special)\s+edition\b|\bgoty\b|\bgame\s+of\s+the\s+year\b/i;
 const BRACKETED = /\[[^\]]*]|\([^)]*\)/g;
 const TRAILING_GROUP = /-[A-Za-z0-9]+$/;
 const YEAR_TOKEN = /\b(19|20)\d{2}\b/g;
@@ -148,6 +150,53 @@ function similarity(a: string, b: string) {
   return inter.length / union.size;
 }
 
+function stripEditionMarkers(value: string) {
+  return value.replace(EDITION_FLUFF, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+function matchTokens(value: string) {
+  return normalizeForSimilarity(stripEditionMarkers(value)).split(" ").filter(Boolean);
+}
+
+function significantTokens(value: string) {
+  return matchTokens(value).filter(
+    (token) => token.length > 2 && !["the", "and", "for", "with", "from"].includes(token),
+  );
+}
+
+function trailingSequenceToken(value: string) {
+  const tokens = matchTokens(value);
+  const last = tokens.at(-1);
+  if (!last) return null;
+  if (/^(?:\d{1,4}|[ivxlcdm]+)$/i.test(last)) {
+    return last.toLowerCase();
+  }
+  return null;
+}
+
+function scoreSteamMatch(query: string, hitName: string) {
+  if (!query.trim() || !hitName.trim()) return 0;
+  if (!EDITION_MARKER.test(query) && EDITION_MARKER.test(hitName)) {
+    return 0;
+  }
+
+  const querySeq = trailingSequenceToken(query);
+  const hitSeq = trailingSequenceToken(hitName);
+  if (querySeq !== hitSeq) {
+    return 0;
+  }
+
+  const queryWords = significantTokens(query);
+  const hitWords = new Set(significantTokens(hitName));
+  if (queryWords.length && queryWords.some((word) => !hitWords.has(word))) {
+    return 0;
+  }
+
+  const baseScore = similarity(stripEditionMarkers(query), stripEditionMarkers(hitName));
+  const fullScore = similarity(query, hitName);
+  return baseScore * 0.7 + fullScore * 0.3;
+}
+
 async function searchSteamApps(query: string): Promise<SteamSearchHit[]> {
   const res = await fetch(
     `https://steamcommunity.com/actions/SearchApps/${encodeURIComponent(query)}`,
@@ -207,13 +256,13 @@ async function resolveSteam(
     let best: SteamSearchHit | null = null;
     let bestScore = 0;
     for (const hit of hits) {
-      const score = similarity(candidate, hit.name);
+      const score = scoreSteamMatch(candidate, hit.name);
       if (score > bestScore) {
         bestScore = score;
         best = hit;
       }
     }
-    if (best && bestScore >= 0.5) {
+    if (best && bestScore >= 0.75) {
       steamSearchCache.set(cacheKey, best.appid);
       return { appId: best.appid, title: best.name };
     }
