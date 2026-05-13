@@ -5,6 +5,8 @@ import { findGameByRouteParam } from "@/lib/game-route";
 import { normalizeGroupTitle } from "@/lib/group-title";
 import { ArtworkImage } from "@/components/artwork-image";
 import { DeleteArchiveSection } from "@/components/delete-archive-section";
+import { GameDetailTabs } from "@/components/game-detail-tabs";
+import { MetadataArtworkChooser } from "@/components/metadata-artwork-chooser";
 import { RematchGameButton } from "@/components/rematch-game-button";
 import { ManualRemapForm } from "@/components/manual-remap-form";
 import { VersionSelect } from "@/components/version-select";
@@ -175,16 +177,6 @@ export default async function GameDetailPage({ params }: Params) {
           </div>
 
           <div className="min-w-0 space-y-8">
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-faint">
-                About
-              </h2>
-              <p className="max-w-prose text-pretty text-[15px] leading-relaxed text-muted md:text-base">
-                {game.description ??
-                  "No description loaded yet. Use Rematch or edit mapping if this release should match a different Steam title."}
-              </p>
-            </div>
-
             <div className="flex flex-col gap-4 rounded-2xl border border-border bg-black/25 p-5 md:flex-row md:flex-wrap md:items-start md:justify-between">
               <VersionSelect
                 currentGameId={game.id}
@@ -195,52 +187,91 @@ export default async function GameDetailPage({ params }: Params) {
                   updatedAt: version.updatedAt.toISOString(),
                 }))}
               />
-              <RematchGameButton gameId={game.id} />
             </div>
 
-            <ManualRemapForm
-              gameId={game.id}
-              initialValue={game.manualMapTitle}
-              currentTitle={game.title}
-            />
-
-            <DeleteArchiveSection
-              currentGameId={game.id}
-              versions={versions.map((v) => ({ id: v.id, relativePath: v.relativePath }))}
-            />
-
-            <div>
-              <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-faint">
-                Details
-              </h2>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                {[
-                  ["Platform", game.platform],
-                  ["Release year", game.releaseYear ?? "—"],
-                  ["Steam App ID", game.steamAppId ?? "—"],
-                  ["Metadata source", game.metadataSource ?? "—"],
-                  ["Last query", game.lastQueryUsed ?? "—"],
-                  ["Manual map title", game.manualMapTitle ?? "—"],
-                  ["Last indexed", prettyDate(game.updatedAt)],
-                ].map(([label, value]) => (
-                  <div
-                    key={label as string}
-                    className="rounded-xl border border-border bg-white/[0.02] px-4 py-3"
-                  >
-                    <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-faint">
-                      {label}
-                    </dt>
-                    <dd className="mt-1 break-words text-sm text-foreground/95">{value}</dd>
+            <GameDetailTabs
+              overview={
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-faint">
+                      About
+                    </h2>
+                    <p className="max-w-prose text-pretty text-[15px] leading-relaxed text-muted md:text-base">
+                      {game.description ??
+                        "No description loaded yet. Open Settings to rematch metadata or change the manual mapping for this release."}
+                    </p>
                   </div>
-                ))}
-                <div className="rounded-xl border border-border bg-white/[0.02] px-4 py-3 sm:col-span-2">
-                  <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-faint">
-                    File path
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-[13px] text-muted">{game.relativePath}</dd>
+
+                  <div>
+                    <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-faint">
+                      Details
+                    </h2>
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        ["Platform", game.platform],
+                        ["Release year", game.releaseYear ?? "—"],
+                        ["Steam App ID", game.steamAppId ?? "—"],
+                        ["Metadata source", game.metadataSource ?? "—"],
+                        ["Last query", game.lastQueryUsed ?? "—"],
+                        ["Manual map title", game.manualMapTitle ?? "—"],
+                        ["Last indexed", prettyDate(game.updatedAt)],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label as string}
+                          className="rounded-xl border border-border bg-white/[0.02] px-4 py-3"
+                        >
+                          <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-faint">
+                            {label}
+                          </dt>
+                          <dd className="mt-1 break-words text-sm text-foreground/95">{value}</dd>
+                        </div>
+                      ))}
+                      <div className="rounded-xl border border-border bg-white/[0.02] px-4 py-3 sm:col-span-2">
+                        <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-faint">
+                          File path
+                        </dt>
+                        <dd className="mt-1 break-all font-mono text-[13px] text-muted">
+                          {game.relativePath}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
                 </div>
-              </dl>
-            </div>
+              }
+              settings={
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-border bg-black/25 p-5 shadow-inner shadow-black/20">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-faint">
+                      Metadata match
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Retry metadata matching for this release when it landed on the wrong game.
+                    </p>
+                    <div className="mt-4">
+                      <RematchGameButton gameId={game.id} />
+                    </div>
+                  </div>
+
+                  <ManualRemapForm
+                    gameId={game.id}
+                    initialValue={game.manualMapTitle}
+                    currentTitle={game.title}
+                  />
+
+                  <MetadataArtworkChooser
+                    gameId={game.id}
+                    defaultQuery={game.manualMapTitle?.trim() || game.title}
+                    currentCoverUrl={cover?.url}
+                    currentBackdropUrl={backdrop?.url}
+                  />
+
+                  <DeleteArchiveSection
+                    currentGameId={game.id}
+                    versions={versions.map((v) => ({ id: v.id, relativePath: v.relativePath }))}
+                  />
+                </div>
+              }
+            />
           </div>
         </div>
       </article>

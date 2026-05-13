@@ -18,6 +18,7 @@ export type MetadataCandidate = {
   title: string;
   source: "igdb" | "steam";
   coverUrl?: string;
+  backdropUrl?: string;
   year?: number;
   steamAppId?: string;
 };
@@ -405,7 +406,7 @@ export async function searchMetadataCandidates(query: string): Promise<MetadataC
   const auth = await getIgdbToken();
   if (auth) {
     const igdbQuery = [
-      "fields name,first_release_date,cover.image_id;",
+      "fields name,first_release_date,cover.image_id,artworks.image_id;",
       `search "${clean.replace(/"/g, "")}";`,
       "limit 8;",
     ].join(" ");
@@ -430,6 +431,7 @@ export async function searchMetadataCandidates(query: string): Promise<MetadataC
           title: game.name,
           source: "igdb",
           coverUrl: imageUrl(game.cover?.image_id, "cover_big"),
+          backdropUrl: imageUrl(game.artworks?.[0]?.image_id, "screenshot_huge"),
           year: game.first_release_date
             ? new Date(game.first_release_date * 1000).getUTCFullYear()
             : undefined,
