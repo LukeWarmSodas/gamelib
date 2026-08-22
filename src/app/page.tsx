@@ -4,6 +4,8 @@ import { ArtworkImage } from "@/components/artwork-image";
 
 export const dynamic = "force-dynamic";
 
+type SortMode = "modified" | "scan";
+
 function normalizeGroupTitle(title: string) {
   return title
     .toLowerCase()
@@ -25,11 +27,22 @@ function formatBytes(value: bigint | null): string {
   return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sort?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const sort: SortMode = params?.sort === "scan" ? "scan" : "modified";
+  const orderBy =
+    sort === "scan"
+      ? [{ updatedAt: "desc" as const }, { title: "asc" as const }]
+      : [{ fileModifiedAt: "desc" as const }, { title: "asc" as const }];
+
   const [games, scan] = await Promise.all([
     prisma.game.findMany({
       include: { artworks: true },
-      orderBy: [{ updatedAt: "desc" }, { title: "asc" }],
+      orderBy,
       take: 200,
     }),
     prisma.scanJob.findFirst({ orderBy: { startedAt: "desc" } }),
@@ -84,6 +97,31 @@ export default async function Home() {
                 </span>
               )}
             </div>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted">Sort by</span>
+            <Link
+              href="/"
+              aria-current={sort === "modified" ? "page" : undefined}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                sort === "modified"
+                  ? "border-accent/35 bg-accent-dim text-accent"
+                  : "border-border-bright bg-white/[0.04] text-muted hover:text-foreground"
+              }`}
+            >
+              File modified
+            </Link>
+            <Link
+              href="/?sort=scan"
+              aria-current={sort === "scan" ? "page" : undefined}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                sort === "scan"
+                  ? "border-accent/35 bg-accent-dim text-accent"
+                  : "border-border-bright bg-white/[0.04] text-muted hover:text-foreground"
+              }`}
+            >
+              Last scanned
+            </Link>
           </div>
         </div>
       </header>

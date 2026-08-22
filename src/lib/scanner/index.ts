@@ -175,7 +175,7 @@ async function runScanInternal(options?: ScanOptions): Promise<ScanStats> {
         if (!force && existing && existing.scanContentKey === contentKey) {
           await prisma.game.update({
             where: { id: existing.id },
-            data: { lastSeenAt: now },
+            data: { fileModifiedAt: stat.mtime, lastSeenAt: now },
           });
           stats.gamesSkipped += 1;
           continue;
@@ -201,6 +201,7 @@ async function runScanInternal(options?: ScanOptions): Promise<ScanStats> {
             relativePath: rel,
             extension: ext,
             fileSizeBytes: isDirectoryRelease ? null : BigInt(stat.size),
+            fileModifiedAt: stat.mtime,
             releaseYear: metadata.releaseYear,
             genres: metadata.genres?.join(", "),
             description: metadata.description,
@@ -219,6 +220,7 @@ async function runScanInternal(options?: ScanOptions): Promise<ScanStats> {
             relativePath: rel,
             extension: ext,
             fileSizeBytes: isDirectoryRelease ? null : BigInt(stat.size),
+            fileModifiedAt: stat.mtime,
             releaseYear: metadata.releaseYear,
             genres: metadata.genres?.join(", "),
             description: metadata.description,

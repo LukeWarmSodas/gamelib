@@ -16,6 +16,7 @@ model Game {
   relativePath   String
   extension      String
   fileSizeBytes  BigInt?
+  fileModifiedAt DateTime?
   releaseYear    Int?
   genres         String?
   description    String?
